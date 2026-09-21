@@ -2,11 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
-  try {
-    let supabaseResponse = NextResponse.next({
-      request,
-    })
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
+  try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xpdrsolbvfbnxopobdzr.supabase.co'
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_JILwssEDqMGsQC6ZoxXxtw_fSYJpI3k'
 
@@ -19,7 +19,7 @@ export async function proxy(request: NextRequest) {
             return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
             supabaseResponse = NextResponse.next({
               request,
             })
@@ -53,16 +53,23 @@ export async function proxy(request: NextRequest) {
     }
 
     if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role, status')
-        .eq('id', user.id)
-        .single()
+      let role = 'employee'
+      let status = 'active'
 
-      if (error) console.error('PROXY PROFILE ERR:', error)
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, status')
+          .eq('id', user.id)
+          .maybeSingle()
 
-      const role = profile?.role || 'employee'
-      const status = profile?.status || 'pending'
+        if (profile) {
+          role = profile.role || 'employee'
+          status = profile.status || 'pending'
+        }
+      } catch (profErr) {
+        console.error('Proxy profile fetch error:', profErr)
+      }
 
       // If logged in and trying to access login/signup, redirect to appropriate dashboard
       if (url.pathname.startsWith('/login') || url.pathname.startsWith('/signup')) {
@@ -101,10 +108,8 @@ export async function proxy(request: NextRequest) {
 
     return supabaseResponse
   } catch (error: any) {
-    return new NextResponse(
-      "MIDDLEWARE CRASHED WITH ERROR: " + (error?.message || String(error)) + "\n\nStack: " + (error?.stack || ""),
-      { status: 500 }
-    )
+    console.error('Proxy top-level error:', error)
+    return supabaseResponse
   }
 }
 

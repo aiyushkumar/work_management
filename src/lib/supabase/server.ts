@@ -32,8 +32,14 @@ export async function createClient() {
 
 // Admin client with Service Role Key (bypasses RLS policies for manager portal queries)
 export async function createAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!serviceKey) {
+    // If Service Role Key is not configured on environment, fall back to standard client safely
+    return createClient()
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xpdrsolbvfbnxopobdzr.supabase.co'
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
   return createSupabaseClient(
     supabaseUrl,

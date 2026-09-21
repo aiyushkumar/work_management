@@ -4,22 +4,43 @@ import { logout } from '@/app/(auth)/actions'
 import { ManagerMobileNav } from '@/components/layout/manager-mobile-nav'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ManagerLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  let managerName = 'Manager'
+  let managerEmail = ''
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, email')
-    .eq('id', user?.id)
-    .single()
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    const user = data?.user
 
-  const managerName = profile?.full_name || 'Manager'
-  const managerEmail = profile?.email || user?.email || ''
+    if (user?.id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profile) {
+        managerName = profile.full_name || 'Manager'
+        managerEmail = profile.email || user.email || ''
+      } else {
+        managerEmail = user.email || ''
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (err: any) {
+    if (err?.digest === 'DYNAMIC_SERVER_USAGE' || err?.message?.includes('DYNAMIC_SERVER_USAGE')) {
+      throw err
+    }
+    console.error('ManagerLayout profile fetch error:', err)
+  }
+
   const initialLetter = managerName.charAt(0).toUpperCase()
 
   return (
@@ -134,4 +155,3 @@ export default async function ManagerLayout({
     </div>
   )
 }
-
