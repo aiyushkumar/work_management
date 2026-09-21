@@ -1,31 +1,34 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, CheckSquare, Home, UserCheck, Clock, MapPin, Building, UsersRound, PhoneCall } from 'lucide-react'
 
 export default async function ManagerDashboard() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Use Admin Client to bypass RLS policies for manager dashboard calculations
+  const adminSupabase = await createAdminClient()
 
   // Fetch logged in manager profile
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: managerProfile } = await supabase
+  const { data: managerProfile } = await adminSupabase
     .from('profiles')
     .select('full_name')
     .eq('id', user?.id)
     .single()
 
   // 1. Employee Stats
-  const { count: totalEmployees } = await supabase
+  const { count: totalEmployees } = await adminSupabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
     .eq('role', 'employee')
     
-  const { count: pendingEmployees } = await supabase
+  const { count: pendingEmployees } = await adminSupabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
     .eq('role', 'employee')
     .eq('status', 'pending')
 
-  const { count: activeEmployees } = await supabase
+  const { count: activeEmployees } = await adminSupabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
     .eq('role', 'employee')
@@ -33,7 +36,7 @@ export default async function ManagerDashboard() {
 
   // 2. Task Stats
   const today = new Date().toISOString().split('T')[0]
-  const { data: tasksToday } = await supabase
+  const { data: tasksToday } = await adminSupabase
     .from('tasks')
     .select('status')
     .gte('created_at', today)
@@ -43,7 +46,7 @@ export default async function ManagerDashboard() {
   const totalTasksToday = tasksToday?.length || 0
 
   // 3. Property Stats
-  const { data: allProperties } = await supabase
+  const { data: allProperties } = await adminSupabase
     .from('properties')
     .select('status')
 
@@ -52,15 +55,16 @@ export default async function ManagerDashboard() {
   const approvedProperties = allProperties?.filter(p => p.status === 'approved').length || 0
 
   // 4. Lead Stats
-  const { count: totalLeads } = await supabase
+  const { count: totalLeads } = await adminSupabase
     .from('leads')
     .select('*', { count: 'exact', head: true })
     
-  const { count: todayFollowups } = await supabase
+  const { count: todayFollowups } = await adminSupabase
     .from('lead_followups')
     .select('*', { count: 'exact', head: true })
     .eq('followup_date', today)
     .neq('status', 'completed')
+
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">

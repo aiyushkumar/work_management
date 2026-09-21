@@ -1,67 +1,41 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { format, differenceInMinutes } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
-import { Clock, MapPin, User, CheckCircle2, Calendar, ShieldAlert, Navigation } from 'lucide-react'
+import { Clock, MapPin, User, CheckCircle2, Calendar, Navigation } from 'lucide-react'
 
 export default async function ManagerAttendance() {
   const supabase = await createClient()
+  await supabase.auth.getUser()
 
-  // 1. Primary Query: Try join with profiles
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let attendanceRecords: any[] = []
-  let fetchError: string | null = null
+  // Use Admin Client to bypass RLS policies for manager reporting
+  const adminSupabase = await createAdminClient()
 
-  const { data: primaryData, error: primaryErr } = await supabase
+  // Query all attendance records
+  const { data: attendanceData } = await adminSupabase
     .from('attendance')
-    .select(`
-      *,
-      profiles(full_name, email, phone)
-    `)
+    .select('*')
     .order('date', { ascending: false })
 
-  if (!primaryErr && primaryData && primaryData.length > 0) {
+  // Fetch profiles for all employees
+  const { data: profilesData } = await adminSupabase
+    .from('profiles')
+    .select('id, full_name, email, phone')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p]))
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attendanceRecords = (attendanceData || []).map((item: any) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attendanceRecords = primaryData.map((item: any) => ({
+    const p: any = profileMap.get(item.employee_id)
+    return {
       ...item,
-      employee_name: item.profiles?.full_name || 'Employee',
-      employee_email: item.profiles?.email || '',
-      employee_phone: item.profiles?.phone || '',
-    }))
-  } else {
-    // 2. Fallback Query: Query attendance directly and fetch matching profiles
-    const { data: rawAttendance, error: rawErr } = await supabase
-      .from('attendance')
-      .select('*')
-      .order('date', { ascending: false })
-
-    if (rawErr) {
-      fetchError = rawErr.message
-    } else if (rawAttendance && rawAttendance.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const empIds = Array.from(new Set(rawAttendance.map((r: any) => r.employee_id).filter(Boolean)))
-      
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .in('id', empIds)
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profileMap = new Map(profilesData?.map((p: any) => [p.id, p]))
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      attendanceRecords = rawAttendance.map((item: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const p: any = profileMap.get(item.employee_id)
-        return {
-          ...item,
-          employee_name: p?.full_name || `Employee (${item.employee_id?.slice(0, 6)})`,
-          employee_email: p?.email || '',
-          employee_phone: p?.phone || '',
-        }
-      })
+      employee_name: p?.full_name || `Employee (${item.employee_id?.slice(0, 6)})`,
+      employee_email: p?.email || '',
+      employee_phone: p?.phone || '',
     }
-  }
+  })
 
   // Calculate Summary Stats
   const today = new Date().toISOString().split('T')[0]
@@ -124,35 +98,6 @@ export default async function ManagerAttendance() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Database RLS Warning Notice if records are empty */}
-      {attendanceRecords.length === 0 && (
-        <Card className="border-amber-300 bg-amber-50 shadow-sm">
-          <CardContent className="p-6 space-y-3">
-            <div className="flex items-center gap-2 font-bold text-amber-900 text-base">
-              <ShieldAlert size={20} className="text-amber-600" />
-              No Attendance Records Found or Supabase RLS Access Required
-            </div>
-            <p className="text-sm text-amber-800 leading-relaxed">
-              If an employee clicked <strong>"START FIELD WORK"</strong> but the record isn't showing here, it is usually because Supabase Row Level Security (RLS) on the <code>attendance</code> table is restricting reads to the employee who created it.
-            </p>
-            <div className="bg-white p-4 rounded-md border border-amber-200 text-xs font-mono text-slate-800 space-y-1">
-              <p className="font-bold text-slate-600 font-sans">To allow managers to view all employee attendance, run this SQL in Supabase SQL Editor:</p>
-              <pre className="text-blue-700 bg-slate-50 p-2 rounded overflow-x-auto">
-{`-- Allow active managers to view all attendance records
-CREATE POLICY "Managers can view all attendance" 
-ON public.attendance FOR SELECT 
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND role = 'manager'
-  )
-);`}
-              </pre>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Attendance Log Table / Cards */}
       <div className="space-y-4">
@@ -257,10 +202,10 @@ USING (
           )
         })}
 
-        {attendanceRecords.length === 0 && !fetchError && (
+        {attendanceRecords.length === 0 && (
           <div className="bg-white p-12 text-center rounded-lg border shadow-sm space-y-3">
             <User size={40} className="mx-auto text-slate-400" />
-            <h3 className="font-bold text-lg text-navy-900">No Attendance Submitted Yet</h3>
+            <h3 className="font-bold text-lg text-navy-900">No Attendance Records Logged Yet</h3>
             <p className="text-slate-500 text-sm max-w-md mx-auto">
               When field employees click "START FIELD WORK" or "END FIELD WORK" on their dashboard, their GPS location and check-in times will automatically populate here.
             </p>
