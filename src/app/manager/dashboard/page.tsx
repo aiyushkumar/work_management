@@ -5,6 +5,14 @@ import { Users, CheckSquare, Home, UserCheck, Clock, MapPin, Building, UsersRoun
 export default async function ManagerDashboard() {
   const supabase = await createClient()
 
+  // Fetch logged in manager profile
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: managerProfile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user?.id)
+    .single()
+
   // 1. Employee Stats
   const { count: totalEmployees } = await supabase
     .from('profiles')
@@ -57,9 +65,14 @@ export default async function ManagerDashboard() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       <div>
-        <h1 className="text-3xl font-bold text-navy-900">Manager Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Real-time overview for {new Date().toLocaleDateString()}</p>
+        <h1 className="text-3xl font-bold text-navy-900">
+          Welcome back, {managerProfile?.full_name || 'Manager'} 👋
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manager Dashboard — Real-time overview for {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
       </div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         

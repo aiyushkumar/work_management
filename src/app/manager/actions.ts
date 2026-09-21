@@ -65,3 +65,32 @@ export async function createTask(formData: FormData) {
   revalidatePath('/manager/tasks')
   redirect('/manager/tasks')
 }
+
+export async function updateManagerProfile(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: formData.get('full_name') as string || undefined,
+      phone: formData.get('phone') as string || null,
+      city: formData.get('city') as string || null,
+      bank_name: formData.get('bank_name') as string || null,
+      bank_account_number: formData.get('bank_account_number') as string || null,
+      bank_ifsc: formData.get('bank_ifsc') as string || null,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('Error updating manager profile:', error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/manager/profile')
+  revalidatePath('/manager/dashboard')
+  revalidatePath('/manager')
+}
+
