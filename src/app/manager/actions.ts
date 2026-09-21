@@ -124,7 +124,7 @@ export async function updateTaskReviewStatus(taskId: string, action: 'approve' |
   return { success: true }
 }
 
-export async function updateAllowanceStatus(allowanceId: string, status: 'approved' | 'rejected') {
+export async function updateAllowanceStatus(allowanceId: string, status: 'approved' | 'rejected'): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -139,8 +139,8 @@ export async function updateAllowanceStatus(allowanceId: string, status: 'approv
 
   revalidatePath('/manager/allowances')
   revalidatePath('/manager/dashboard')
-  return { success: true }
 }
+
 
 
 
