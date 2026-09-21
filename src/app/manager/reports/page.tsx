@@ -3,7 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { format } from 'date-fns'
 import { FileText, Calendar, CheckSquare, Building, Users, Clock } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ManagerReports() {
+
   const supabase = await createClient()
   await supabase.auth.getUser()
 

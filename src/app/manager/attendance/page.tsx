@@ -4,38 +4,69 @@ import { format, differenceInMinutes } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { Clock, MapPin, User, CheckCircle2, Calendar, Navigation } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ManagerAttendance() {
-  const supabase = await createClient()
-  await supabase.auth.getUser()
-
-  // Use Admin Client to bypass RLS policies for manager reporting
-  const adminSupabase = await createAdminClient()
-
-  // Query all attendance records
-  const { data: attendanceData } = await adminSupabase
-    .from('attendance')
-    .select('*')
-    .order('date', { ascending: false })
-
-  // Fetch profiles for all employees
-  const { data: profilesData } = await adminSupabase
-    .from('profiles')
-    .select('id, full_name, email, phone')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p]))
+  let attendanceRecords: any[] = []
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const attendanceRecords = (attendanceData || []).map((item: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p: any = profileMap.get(item.employee_id)
-    return {
-      ...item,
-      employee_name: p?.full_name || `Employee (${item.employee_id?.slice(0, 6)})`,
-      employee_email: p?.email || '',
-      employee_phone: p?.phone || '',
+  try {
+    const supabase = await createClient()
+
+    // 1. Try with standard server client
+    const { data: primaryData, error: primaryErr } = await supabase
+      .from('attendance')
+      .select(`
+        *,
+        profiles(full_name, email, phone)
+      `)
+      .order('date', { ascending: false })
+
+    if (!primaryErr && primaryData && primaryData.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      attendanceRecords = primaryData.map((item: any) => ({
+        ...item,
+        employee_name: item.profiles?.full_name || 'Employee',
+        employee_email: item.profiles?.email || '',
+        employee_phone: item.profiles?.phone || '',
+      }))
+    } else {
+      // 2. Try with Admin Client
+      try {
+        const adminSupabase = await createAdminClient()
+        const { data: adminData } = await adminSupabase
+          .from('attendance')
+          .select('*')
+          .order('date', { ascending: false })
+
+        if (adminData && adminData.length > 0) {
+          const { data: profilesData } = await adminSupabase
+            .from('profiles')
+            .select('id, full_name, email, phone')
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p]))
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          attendanceRecords = adminData.map((item: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const p: any = profileMap.get(item.employee_id)
+            return {
+              ...item,
+              employee_name: p?.full_name || `Employee (${item.employee_id?.slice(0, 6)})`,
+              employee_email: p?.email || '',
+              employee_phone: p?.phone || '',
+            }
+          })
+        }
+      } catch (adminErr) {
+        console.error('Admin client fallback error:', adminErr)
+      }
     }
-  })
+  } catch (err) {
+    console.error('ManagerAttendance catch error:', err)
+  }
 
   // Calculate Summary Stats
   const today = new Date().toISOString().split('T')[0]

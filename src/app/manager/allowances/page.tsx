@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, XCircle, Landmark, Calendar } from 'lucide-react'
 import { updateAllowanceStatus } from '@/app/manager/actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ManagerAllowances() {
+
   const supabase = await createClient()
   await supabase.auth.getUser()
 
