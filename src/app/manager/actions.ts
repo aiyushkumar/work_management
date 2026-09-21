@@ -94,3 +94,34 @@ export async function updateManagerProfile(formData: FormData) {
   revalidatePath('/manager')
 }
 
+export async function updateTaskReviewStatus(taskId: string, action: 'approve' | 'reject', managerNotes?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
+  const newStatus = action === 'approve' ? 'completed' : 'in_progress'
+
+  const { error: taskError } = await supabase
+    .from('tasks')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+
+  if (taskError) throw new Error(taskError.message)
+
+  await supabase
+    .from('task_updates')
+    .insert({
+      task_id: taskId,
+      employee_id: user.id,
+      status: newStatus,
+      notes: managerNotes || (action === 'approve' ? 'Task approved by manager.' : 'Task rejected by manager. Please resubmit proof.'),
+    })
+
+  revalidatePath(`/manager/tasks/${taskId}`)
+  revalidatePath('/manager/tasks')
+  revalidatePath('/manager/dashboard')
+  return { success: true }
+}
+
+
