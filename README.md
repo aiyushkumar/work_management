@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mahakal Property Bhopal - Internal Management System
 
-## Getting Started
+A production-ready Next.js application for field operations and team management.
 
-First, run the development server:
+## Setup Instructions
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 1. Environment Variables
+Create a `.env.local` file with your Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-secret-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Database Migration
+Run the initial SQL script (`supabase/migrations/0001_initial_schema.sql`) in your Supabase SQL Editor to create all tables and RLS policies.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## HOW TO CREATE THE FIRST MANAGER
 
-## Learn More
+Normal signups from the `/signup` page ALWAYS default to `role = employee` and `status = pending`. To create the first manager (your account) so you can access the `/manager/dashboard`:
 
-To learn more about Next.js, take a look at the following resources:
+**Step 1:**
+Create an account using the normal `/signup` page.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Step 2:**
+Open your Supabase Dashboard at supabase.com.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Step 3:**
+Navigate to **Authentication → Users** and find the User UUID of the account you just created.
 
-## Deploy on Vercel
+**Step 4:**
+Navigate to the **SQL Editor** on the left sidebar.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Step 5:**
+Run the following secure SQL command, replacing `YOUR-UUID-HERE` with the actual UUID from Step 3:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sql
+UPDATE profiles
+SET role = 'manager', status = 'active'
+WHERE id = 'YOUR-UUID-HERE';
+```
+
+**Step 6:**
+Log out of the app and log in again, or just navigate to `/debug` to verify your role has changed.
+
+**Step 7:**
+The application will now securely redirect you to `/manager/dashboard`.
+
+---
+
+## Debugging
+
+If you run into routing or authentication issues, you can visit `/debug` when logged in to view your current raw User ID, Role, and Status directly from the database.
