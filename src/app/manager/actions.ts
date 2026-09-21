@@ -124,4 +124,23 @@ export async function updateTaskReviewStatus(taskId: string, action: 'approve' |
   return { success: true }
 }
 
+export async function updateAllowanceStatus(allowanceId: string, status: 'approved' | 'rejected') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
+  const { error } = await supabase
+    .from('field_allowances')
+    .update({ status })
+    .eq('id', allowanceId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/manager/allowances')
+  revalidatePath('/manager/dashboard')
+  return { success: true }
+}
+
+
 
